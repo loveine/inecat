@@ -14,9 +14,10 @@
     <section class="panel" id="auth-panel">
       <div class="tabs"><button class="tab active" data-mode="login">登录</button><button class="tab" data-mode="register">注册</button></div>
       <form id="auth-form"><label>用户名<input name="username" required minlength="3" maxlength="32" autocomplete="username" pattern="[A-Za-z0-9_]+"></label><label>密码<input name="password" type="password" required minlength="12" maxlength="128" autocomplete="current-password"></label><button class="primary" id="auth-submit">登录</button><p class="hint">用户名 3–32 位字母、数字或下划线；密码至少 12 位。</p></form>
-      <button id="logout" class="quiet hidden">退出登录</button><p id="notice" role="status" aria-live="polite"></p>
+      <button id="logout" class="quiet hidden">退出登录</button>
     </section>
-    <section class="panel hidden" id="upload-panel"><h2>分享一张猫咪照片</h2><form id="upload-form"><label>照片标题<input name="title" maxlength="120" required></label><label>简单介绍<textarea name="description" maxlength="2000" rows="3"></textarea></label><label>选择照片<input type="file" name="file" accept="image/jpeg,image/png,image/webp" required></label><p class="hint">支持 JPEG、PNG、WebP，单张最多 10 MiB。</p><button class="primary">上传照片</button></form></section>
+    <p id="notice" role="status" aria-live="polite"></p>
+    <section class="panel hidden" id="upload-panel"><h2>分享一张猫咪照片</h2><form id="upload-form"><label>照片标题<input name="title" maxlength="120" required></label><label>简单介绍<textarea name="description" maxlength="2000" rows="3"></textarea></label><label>选择照片<input type="file" name="file" accept="image/jpeg,image/png,image/webp" required></label><p class="hint">支持 JPEG、PNG、WebP，单张最多 10 MiB、1200 万像素。</p><button class="primary">上传照片</button></form></section>
     <section class="panel hidden" id="admin-panel"><h2>账号管理</h2><div id="users"></div></section>
     <section class="gallery-head"><h2>大家的猫咪</h2><span id="count"></span></section>
     <section id="gallery" class="gallery" aria-live="polite"></section>

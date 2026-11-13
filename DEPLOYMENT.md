@@ -74,6 +74,7 @@ sudo tar -C /usr/share/nginx -czf /root/inecat-static-backup-$(date +%F-%H%M%S).
 ```nginx
 limit_req_zone $binary_remote_addr zone=inecat_auth:10m rate=10r/m;
 limit_req_zone $binary_remote_addr zone=inecat_write:10m rate=30r/m;
+limit_conn_zone $binary_remote_addr zone=inecat_upload:10m;
 ```
 
 把以下 `location` 合并到现有 `inecat.online` 的 HTTPS `server {}`。保留已有 `root`、TLS、静态文件、缓存、视频 Range 处理和其他 location。只增加路由，不替换整个配置：
@@ -107,6 +108,7 @@ location ^~ /api/ {
     proxy_connect_timeout 5s;
     proxy_read_timeout 60s;
     limit_req zone=inecat_write burst=20 nodelay;
+    limit_conn inecat_upload 2;
 }
 
 location = /api/login {
@@ -210,7 +212,7 @@ sudo docker compose stop api
 ## 已知运维边界
 
 - 当前使用 `mysql:8.4` Docker 镜像标签及固定 Python 依赖版本（依赖版本按 2026-11-12 的 PyPI 信息核对）；上线前仍要按组织漏洞扫描与升级流程复核镜像和依赖，再构建部署。
-- 图片上传接受单张 10 MiB 内的 JPEG、PNG、WebP，最多约 2500 万像素。视频继续使用现有静态站点文件；新社区不接收视频。
+- 图片上传接受单张 10 MiB 内、最多 1200 万像素的 JPEG、PNG、WebP。每个 API 进程一次解码一张图，Nginx 限制同一来源并发 API 连接，容器 `/tmp` 限制为 128 MiB。视频继续使用现有静态站点文件；新社区不接收视频。
 - Nginx 速率限制按远端 IP 生效。如果站点在 CDN/代理后，需先正确配置可信真实 IP，避免所有请求共用代理 IP 或伪造来源。
-- 数据表通过 Alembic 管理；部署新版本前先备份数据库，按版本迁移说明执行 `alembic upgrade head`。
+- 数据表通过 Alembic 管理；首次安装也必须在创建首个管理员前运行 `alembic upgrade head`。部署新版本前先备份数据库；不要运行 `alembic downgrade`，当前迁移会拒绝可能删除用户与照片元数据的降级操作，应通过备份恢复处理回滚。
 - 组件尚未实现邮件找回、邮箱验证、审核队列和多节点限流。这些不影响当前的所有权隔离，但属于后续运营能力。

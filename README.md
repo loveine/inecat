@@ -17,6 +17,7 @@
 
 ```bash
 docker compose up -d --build
+docker compose exec api alembic upgrade head
 docker compose exec api python -m app.cli create-admin
 ```
 
@@ -29,7 +30,7 @@ docker compose exec api python -m app.cli create-admin
 - 管理员可管理所有照片，并可停用普通账号；管理员身份在每次请求时从数据库读取，不信任客户端角色字段。
 - 密码使用 Argon2id 哈希；会话令牌随机生成，只以 SHA-256 摘要存储，并支持服务端撤销及过期。
 - 所有变更请求要求会话绑定的 CSRF 令牌；Cookie 使用 HttpOnly、SameSite=Lax，线上强制 Secure。
-- 上传限制为 10 MiB，允许 JPEG/PNG/WebP，经 Pillow 解码验证并重新编码，剥除 EXIF；文件名由 UUID 生成，不采用用户提供路径。
+- 上传限制为 10 MiB、1200 万像素，允许 JPEG/PNG/WebP，经 Pillow 解码验证并重新编码，剥除 EXIF；每个 API 进程一次处理一张图，文件名由 UUID 生成，不采用用户提供路径。
 - Nginx 上传目录设置为只读静态访问，应用只负责写入；不接受 SVG、视频、任意文件或可执行内容。
 
 ## 管理员权限

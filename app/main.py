@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import io
@@ -24,7 +25,10 @@ from .models import LoginSession, Photo, User
 DATABASE_URL = os.environ["DATABASE_URL"]
 SESSION_SECRET = os.environ["SESSION_SECRET"].encode()
 CSRF_SECRET = os.environ["CSRF_SECRET"].encode()
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
+COOKIE_SECURE_VALUE = os.getenv("COOKIE_SECURE", "true").lower()
+if COOKIE_SECURE_VALUE not in {"true", "false"}:
+    raise RuntimeError("COOKIE_SECURE must be either 'true' or 'false'")
+COOKIE_SECURE = COOKIE_SECURE_VALUE == "true"
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/data/uploads"))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", "10485760"))
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "12"))
@@ -39,7 +43,9 @@ password_hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=2)
 DUMMY_PASSWORD_HASH = password_hasher.hash("inecat-login-timing-only-not-a-user-password")
 COOKIE_NAME = "inecat_session"
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,32}$")
-Image.MAX_IMAGE_PIXELS = 25_000_000
+MAX_IMAGE_PIXELS = 12_000_000
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+IMAGE_PROCESSING = asyncio.Semaphore(1)
 
 app = FastAPI(title="Inecat Gallery API", docs_url=None, redoc_url=None)
 
@@ -251,13 +257,15 @@ async def read_valid_image(upload: UploadFile) -> tuple[bytes, str]:
             break
         contents.extend(chunk)
         if len(contents) > MAX_UPLOAD_BYTES:
-            raise HTTPException(413, "Image exceeds the 10 MiB upload limit")
+            raise HTTPException(413, "Image exceeds the configured upload limit")
     if not contents:
         raise HTTPException(400, "Choose an image file")
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             with Image.open(io.BytesIO(contents)) as image:
+                if image.width * image.height > MAX_IMAGE_PIXELS:
+                    raise HTTPException(413, "Image exceeds the 12 megapixel limit")
                 if image.format not in {"JPEG", "PNG", "WEBP"}:
                     raise HTTPException(415, "Only JPEG, PNG, and WebP images are allowed")
                 image.verify()
@@ -291,7 +299,8 @@ async def upload_photo(request: Request, title: str, description: str = "", file
     check_csrf(request, session, x_csrf_token)
     if not 1 <= len(title.strip()) <= 120 or len(description) > 2000:
         raise HTTPException(422, "Title must have 1-120 characters; description is limited to 2000")
-    content, mime = await read_valid_image(file)
+    async with IMAGE_PROCESSING:
+        content, mime = await read_valid_image(file)
     ext = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}[mime]
     stored_name = f"{uuid.uuid4().hex}{ext}"
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
